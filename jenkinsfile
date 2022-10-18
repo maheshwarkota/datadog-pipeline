@@ -1,0 +1,115 @@
+pipeline {
+	agent any
+	stages {
+	  stage('') {
+		  steps {
+			  sh ''
+		  }
+	  }
+		stage('set label') {
+			steps {
+				withAWS(region:'us-east-1', ) {
+					sh '''
+						kubectl
+					'''
+				}
+			}
+		}
+
+		stage('set role') {
+			steps {
+				withAWS(region:'us-east-1', ) {
+					sh '''
+						kubectl
+					'''
+				}
+			}
+		}
+
+		stage('set role') {
+			steps {
+				withAWS(region:'eu-west-1', ) {
+					sh '''
+						kubectl
+					'''
+				}
+			}
+		}
+
+		stage('set role') {
+			steps {
+				withAWS(region:'eu-west-1', ) {
+					sh '''
+						kubectl
+					'''
+				}
+			}
+		}
+
+		stage('set role') {
+			steps {
+				withAWS(region:'eu-west-1', ) {
+					sh '''
+						kubectl
+					'''
+				}
+			}
+		}
+
+		stage('') {
+			steps {
+
+				}
+			}
+		}
+
+    stage('Wait user approve') {
+            steps {
+                input "Ready to redirect traffic to green?"
+            }
+        }}
+
+		stage('') {
+			steps {
+				withAWS(region:'us-east-1', credentials:'sutu18') {
+					sh '''
+						kubectl apply -f pdbblue.yml
+					'''
+				}
+			}
+		}
+
+		stage('add pod disruption budget green') {
+			steps {
+				withAWS(region:'us-east-1', credentials:'sutu18') {
+					sh '''
+						kubectl apply -f pdbgreen.yml
+					'''
+				}
+			}
+		}
+
+		stage('Create the service in the cluster, redirect to blue') {
+			steps {
+				withAWS(region:'us-east-1', credentials:'sutu18') {
+					sh '''
+						kubectl apply -f blueservice.yml
+					'''
+				}
+			}
+		}
+
+
+
+		stage('Create the service in the cluster, redirect to green') {
+			steps {
+				withAWS(region:'us-east-1', credentials:'sutu18') {
+					sh '''
+						kubectl apply -f greenservice.yml
+					'''
+				}
+			}
+		}
+
+	}
+}

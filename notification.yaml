@@ -1,0 +1,99 @@
+pipeline {
+
+  agent {
+    docker {
+      image '596354302693.dkr.ecr.eu-west-1.amazonaws.com/python-with-k8s-tools:1.0.11'
+      registryUrl 'https://596354302693.dkr.ecr.eu-west-1.amazonaws.com'
+      registryCredentialsId 'ecr:eu-west-1:aws-dazzler-ops-credentials'
+    }
+  }
+
+  environment {
+
+    AWS_DEFAULT_REGION = "eu-west-1"
+
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(daysToKeepStr: '3'))
+  }
+
+  stages {
+
+    stage("Build") {
+      steps {
+        dir('create-prod-release-notification') {
+          wrap([$class: 'BuildUser']) {
+            withCredentials([usernamePassword(credentialsId: 'aws-dazzler-ops', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+              sh 'python generate_notifications.py'
+              sh 'ls -al artifacts'
+            }
+          }
+        }
+      }
+
+      post {
+        success {
+          wrap([$class: 'BuildUser']) {
+            emailext(
+              to: "${env.BUILD_USER_EMAIL}",
+              subject: 'Jenkins Create UDP Production Release Notification',
+              body: "Jenkins Build ${currentBuild.currentResult}: Job ${env.JOB_NAME}\n\n$BUILD_URL\n\nPlease review the draft: https://digitalroute.atlassian.net/wiki/spaces/DEV/pages/455181148/UDP+Release+Notifications+Drafts\n\nIf everything is verified, please choose YES/NO to resume the running job.\nhttps://jenkins-dz.digitalroute.com/blue/organizations/jenkins/create-prod-release-notification/detail/create-prod-release-notification/${currentBuild.number}/pipeline",
+            )
+          }
+        }
+      }
+    }
+
+    stage("Deploy") {
+      steps {
+
+        dir('create-prod-release-notification') {
+          script {
+            def PROCEED = input(
+                    message: 'Please verify the draft copies. Proceed?\nhttps://digitalroute.atlassian.net/wiki/spaces/DEV/pages/455181148',
+                    parameters: [
+                            [$class: 'ChoiceParameterDefinition',
+                            choices: ['NO','YES'].join('\n'),
+                            name: 'Proceed? ',
+                            description: 'Menu - select box option']
+                    ])
+
+            echo "User answer: ${PROCEED}"
+            if( "${PROCEED}" == "YES"){
+              wrap([$class: 'BuildUser']) {
+                withCredentials([usernamePassword(credentialsId: 'aws-dazzler-ops', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                  sh 'python generate_notifications.py --release'
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: 'create-prod-release-notification/artifacts/**/*.*', fingerprint: true
+      wrap([$class: 'BuildUser']) {
+        emailext(
+          to: "${env.BUILD_USER_EMAIL}",
+          subject: 'Jenkins Create UDP Production Release Notification',
+          body: "Jenkins Build ${currentBuild.currentResult}: Job ${env.JOB_NAME}\n\n$BUILD_URL",
+          attachLog: true,
+          compressLog: true,
+        )
+      }
+    }
+
+    cleanup {
+      dir('create-prod-release-notification') {
+        sh 'python generate_notifications.py --cleanup'
+      }
+    }
+  }
+
+}

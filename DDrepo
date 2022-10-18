@@ -1,0 +1,32 @@
+def repo="https://shailendra14k.github.io/sample-helm-chart/"
+pipeline{
+		agent{
+			label 'helm'
+		}
+		stages{
+
+                stage("add Repo") {
+                        steps {
+                               sh "helm repo add https://helm.datadoghq.com"
+                            }
+                    }
+				stage("Deploy to Dev") {
+                        steps {
+                            script{
+					openshift.withCluster(){
+                                        sh "helm upgrade https://helm.datadoghq.com -n dev --wait"
+                                    }
+                                }
+                            }
+                    }
+                stage("Deploy to UAT") {
+                        steps {
+                            script{
+					openshift.withCluster(){
+                                        sh "helm upgrade https://helm.datadoghq.com -n uat --wait"
+                                    }
+                                }
+                            }
+                    }
+            }
+        }
